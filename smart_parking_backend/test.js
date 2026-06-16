@@ -1,0 +1,11 @@
+const mongoose = require('mongoose');
+
+mongoose.connect("mongodb://testuser:test123@ac-x77kgux-shard-00-00.cubpl6x.mongodb.net:27017,ac-x77kgux-shard-00-01.cubpl6x.mongodb.net:27017,ac-x77kgux-shard-00-02.cubpl6x.mongodb.net:27017/?ssl=true&replicaSet=atlas-1sok4l-shard-0&authSource=admin&appName=Cluster0")
+  .then(() => {
+    console.log("✅ Connected successfully");
+    process.exit(0);
+  })
+  .catch(err => {
+    console.error("❌ Error:", err);
+    process.exit(1);
+  });

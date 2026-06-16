@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IoT Smart Parking System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; }
+
+    body.light-mode { background: #f3f4f6; color: #111827; }
+
+    .notif-enter { animation: slideIn 0.35s ease-out forwards; }
+    .notif-leave { animation: slideOut 0.3s ease-in forwards; }
+
+    @keyframes slideIn {
+      from { transform: translateX(110%); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+    @keyframes slideOut {
+      from { transform: translateX(0);    opacity: 1; }
+      to   { transform: translateX(110%); opacity: 0; }
+    }
+
+    .slot-card { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+    .slot-card:hover { transform: translateY(-3px); }
+
+    .slot-available {
+      background: linear-gradient(135deg, #064e3b, #022c22);
+      border: 2px solid #10b981;
+    }
+    .slot-occupied {
+      background: linear-gradient(135deg, #7f1d1d, #450a0a);
+      border: 2px solid #ef4444;
+    }
+
+    .gate-open   { color: #4ade80; }
+    .gate-closed { color: #f87171; }
+
+    @keyframes livePulse {
+      0%, 100% { box-shadow: 0 0 0 0   rgba(74,222,128,0.7); }
+      50%       { box-shadow: 0 0 0 8px rgba(74,222,128,0);   }
+    }
+    .live-dot { animation: livePulse 2s infinite; }
+
+    /* Date chip scrollbar hidden */
+    #date-chips { scrollbar-width: none; }
+    #date-chips::-webkit-scrollbar { display: none; }
+  </style>
+</head>
+
+<body class="bg-gray-900 text-white min-h-screen">
+
+  <!-- STICKY HEADER -->
+  <header class="bg-gray-800 border-b border-gray-700 shadow-xl sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <button onclick="toggleTheme()" class="text-xl bg-gray-700 px-3 py-1 rounded-lg hover:bg-gray-600 transition">
+        <span id="theme-icon">🌙</span>
+      </button>
+      <div class="text-center flex-1">
+        <h1 class="text-lg md:text-2xl font-bold text-teal-400">🚗 IoT Smart Parking</h1>
+        <p class="text-gray-400 text-xs md:text-sm">Real-time Parking Management</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-3 h-3 rounded-full bg-red-500 animate-pulse" id="status-dot"></span>
+        <span class="text-xs md:text-sm text-gray-400" id="status-text">Connecting...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- NOTIFICATIONS -->
+  <div id="notif-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 w-80 max-w-full"></div>
+
+  <!-- MAIN -->
+  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- STAT CARDS -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+      <div class="bg-gray-800 rounded-2xl p-5 border border-gray-700 shadow-xl">
+        <div class="flex justify-between items-center mb-2">
+          <p class="text-gray-400 text-xs font-medium uppercase tracking-wide">Available</p>
+          <span class="text-xl">🟢</span>
+        </div>
+        <p id="stat-available" class="text-5xl font-bold text-green-400">—</p>
+        <p class="text-gray-500 text-xs mt-1">of <span id="stat-total">4</span> slots</p>
+      </div>
+
+      <div class="bg-gray-800 rounded-2xl p-5 border border-gray-700 shadow-xl">
+        <div class="flex justify-between items-center mb-2">
+          <p class="text-gray-400 text-xs font-medium uppercase tracking-wide">Occupied</p>
+          <span class="text-xl">🔴</span>
+        </div>
+        <p id="stat-occupied" class="text-5xl font-bold text-red-400">—</p>
+        <p class="text-gray-500 text-xs mt-1">Currently Parked</p>
+      </div>
+
+      <div class="bg-gray-800 rounded-2xl p-5 border border-gray-700 shadow-xl">
+        <div class="flex justify-between items-center mb-2">
+          <p class="text-gray-400 text-xs font-medium uppercase tracking-wide">Gate</p>
+          <span class="text-xl">🚧</span>
+        </div>
+        <p id="stat-gate" class="text-3xl font-bold gate-closed">—</p>
+        <p class="text-gray-500 text-xs mt-1">Barrier Status</p>
+      </div>
+
+      <div class="bg-gray-800 rounded-2xl p-5 border border-gray-700 shadow-xl">
+        <div class="flex justify-between items-center mb-2">
+          <p class="text-gray-400 text-xs font-medium uppercase tracking-wide">Today</p>
+          <span class="text-xl">📊</span>
+        </div>
+        <div class="flex gap-6 mt-1">
+          <div>
+            <p id="stat-entries" class="text-3xl font-bold text-blue-400">—</p>
+            <p class="text-gray-500 text-xs">In</p>
+          </div>
+          <div>
+            <p id="stat-exits" class="text-3xl font-bold text-purple-400">—</p>
+            <p class="text-gray-500 text-xs">Out</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PARKING LAYOUT + PEAK HOUR -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 bg-gray-800 rounded-2xl p-6 border border-gray-700 shadow-xl">
+        <h2 class="text-base font-semibold text-gray-200 mb-4">🅿️ Parking Layout</h2>
+        <div id="slot-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+      </div>
+
+      <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700 shadow-xl flex flex-col justify-between">
+        <h2 class="text-base font-semibold text-gray-200 mb-4">⏰ Peak Hour Today</h2>
+        <div class="text-center py-4">
+          <p id="peak-hour" class="text-6xl font-bold text-orange-400">— </p>
+          <p class="text-gray-400 text-sm mt-2">Busiest Hour</p>
+          <p id="peak-count" class="text-gray-500 text-xs mt-1">— Entries</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ✅ HOURLY CHART WITH DATE NAVIGATION -->
+    <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700 shadow-xl">
+
+      <!-- Chart title (changes based on selected date) -->
+      <h2 id="chart-title" class="text-base font-semibold text-gray-200 mb-4">📈 Today's Hourly Activity</h2>
+
+      <!-- Date navigator: arrows + chip row (Android step-counter style) -->
+      <div class="flex items-center gap-2 mb-4">
+
+        <!-- Prev arrow -->
+        <button
+          id="date-prev"
+          onclick="shiftChipWindow(-1)"
+          class="px-3 py-1 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm transition flex-shrink-0"
+          title="Earlier dates">
+          ◀
+        </button>
+
+        <!-- Scrollable date chips -->
+        <div
+          id="date-chips"
+          class="flex gap-2 overflow-x-auto flex-1 py-1">
+          <!-- Rendered by JS -->
+        </div>
+
+        <!-- Next arrow -->
+        <button
+          id="date-next"
+          onclick="shiftChipWindow(1)"
+          class="px-3 py-1 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm transition flex-shrink-0"
+          title="More recent dates">
+          ▶
+        </button>
+      </div>
+
+      <!-- Chart canvas -->
+      <div style="height:260px;">
+        <canvas id="hourly-chart"></canvas>
+      </div>
+    </div>
+
+    <!-- ACTIVITY LOG -->
+    <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700 shadow-xl">
+      <h2 class="text-base font-semibold text-gray-200 mb-4">📋 Recent Activity</h2>
+      <div id="activity-log" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+        <p class="text-gray-500 text-center py-4 text-sm">Waiting for activity…</p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="bg-gray-800 border-t border-gray-700 py-4 mt-6">
+    <p class="text-center text-gray-500 text-sm">
+      IoT Smart Parking System &nbsp;•&nbsp; ESP8266 + Node.js + MongoDB Atlas
+    </p>
+  </footer>
+
+  <script src="js/app.js"></script>
+
+  <script>
+    function toggleTheme() {
+      const body = document.body;
+      const icon = document.getElementById('theme-icon');
+      body.classList.toggle('light-mode');
+      icon.textContent = body.classList.contains('light-mode') ? '☀️' : '🌙';
+    }
+  </script>
+
+</body>
+</html>

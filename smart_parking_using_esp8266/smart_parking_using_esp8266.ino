@@ -4,9 +4,13 @@
 #include <Servo.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-#include "secrets.h"
+
+// ═════════ WIFI ═════════
+const char* WIFI_SSID     = "YOUR_WIFI_SSID";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 
 // ═════════ SERVER ═════════
+const char* SERVER_IP     = "YOUR_BACKEND_LOCAL_IP";
 const int SERVER_PORT = 3000;
 
 // ═════════ PIN MAP ═════════
